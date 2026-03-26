@@ -1,0 +1,735 @@
+Air Space Portfolio Analyser - Starter Backend (Flask)
+
+Step 1: Basic working server with database and unlimited assets support
+
+=========================
+
+INSTALLATION STEPS
+
+=========================
+
+1) Install Python (3.10 or higher)
+
+2) Open terminal / command prompt
+
+3) Run these commands:
+
+
+
+pip install flask
+
+
+
+4) Save this file as: app.py
+
+5) Run the server:
+
+
+
+python app.py
+
+
+
+6) Open browser:
+
+http://127.0.0.1:5000
+
+from flask import Flask, request, jsonify import sqlite3 from datetime import datetime
+
+app = Flask(name)
+
+DATABASE = "airspace.db"
+
+=========================
+
+DATABASE CONNECTION
+
+=========================
+
+def get_db_connection(): conn = sqlite3.connect(DATABASE) conn.row_factory = sqlite3.Row return conn
+
+=========================
+
+CREATE TABLES (UNLIMITED)
+
+=========================
+
+def create_tables(): conn = get_db_connection() cursor = conn.cursor()
+
+# Users table
+cursor.execute("""
+    CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT,
+        email TEXT UNIQUE,
+        password TEXT,
+        created_date TEXT
+    )
+""")
+
+# Assets table (UNLIMITED)
+cursor.execute("""
+    CREATE TABLE IF NOT EXISTS assets (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
+        asset_name TEXT,
+        asset_type TEXT,
+        value REAL,
+        currency TEXT,
+        created_date TEXT
+    )
+""")
+
+# Expenses table
+cursor.execute("""
+    CREATE TABLE IF NOT EXISTS expenses (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
+        category TEXT,
+        amount REAL,
+        date TEXT
+    )
+""")
+
+# Goals table
+cursor.execute("""
+    CREATE TABLE IF NOT EXISTS goals (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
+        goal_name TEXT,
+        target_amount REAL,
+        saved_amount REAL,
+        deadline TEXT
+    )
+""")
+
+conn.commit()
+conn.close()
+
+=========================
+
+HOME ROUTE
+
+=========================
+
+@app.route("/") def home(): return "Air Space Portfolio Analyser is running successfully!"
+
+=========================
+
+REGISTER USER
+
+=========================
+
+@app.route("/register", methods=["POST"]) def register(): data = request.json
+
+name = data.get("name")
+email = data.get("email")
+password = data.get("password")
+
+conn = get_db_connection()
+cursor = conn.cursor()
+
+cursor.execute(
+    "INSERT INTO users (name, email, password, created_date) VALUES (?, ?, ?, ?)",
+    (name, email, password, datetime.now())
+)
+
+conn.commit()
+conn.close()
+
+return jsonify({"message": "User registered successfully"})
+
+=========================
+
+ADD ASSET (UNLIMITED)
+
+=========================
+
+@app.route("/add_asset", methods=["POST"]) def add_asset(): data = request.json
+
+user_id = data.get("user_id")
+asset_name = data.get("asset_name")
+asset_type = data.get("asset_type")
+value = data.get("value")
+currency = data.get("currency")
+
+conn = get_db_connection()
+cursor = conn.cursor()
+
+cursor.execute(
+    "INSERT INTO assets (user_id, asset_name, asset_type, value, currency, created_date) VALUES (?, ?, ?, ?, ?, ?)",
+    (user_id, asset_name, asset_type, value, currency, datetime.now())
+)
+
+conn.commit()
+conn.close()
+
+return jsonify({"message": "Asset added successfully (Unlimited supported)"})
+
+=========================
+
+VIEW ALL ASSETS
+
+=========================
+
+@app.route("/assets/int:user_id") def get_assets(user_id): conn = get_db_connection() cursor = conn.cursor()
+
+cursor.execute(
+    "SELECT * FROM assets WHERE user_id = ?",
+    (user_id,)
+)
+
+assets = cursor.fetchall()
+conn.close()
+
+return jsonify([dict(asset) for asset in assets])
+
+=========================
+
+CALCULATE NET WORTH
+
+=========================
+
+@app.route("/net_worth/int:user_id") def net_worth(user_id): conn = get_db_connection() cursor = conn.cursor()
+
+cursor.execute(
+    "SELECT SUM(value) as total FROM assets WHERE user_id = ?",
+    (user_id,)
+)
+
+result = cursor.fetchone()
+conn.close()
+
+total = result["total"] if result["total"] else 0
+
+return jsonify({"net_worth": total})
+
+=========================
+
+START SERVER
+
+=========================
+
+if name == "main": create_tables() app.run(debug=True)
+
+=====================================================
+
+LOGIN SYSTEM
+
+=====================================================
+
+@app.route("/login", methods=["POST"]) def login(): data = request.json
+
+email = data.get("email")
+password = data.get("password")
+
+conn = get_db_connection()
+cursor = conn.cursor()
+
+cursor.execute(
+    "SELECT * FROM users WHERE email = ? AND password = ?",
+    (email, password)
+)
+
+user = cursor.fetchone()
+conn.close()
+
+if user:
+    return jsonify({"message": "Login successful", "user_id": user["id"]})
+else:
+    return jsonify({"message": "Invalid email or password"}), 401
+
+=====================================================
+
+ADD EXPENSE
+
+=====================================================
+
+@app.route("/add_expense", methods=["POST"]) def add_expense(): data = request.json
+
+user_id = data.get("user_id")
+category = data.get("category")
+amount = data.get("amount")
+date = data.get("date")
+
+conn = get_db_connection()
+cursor = conn.cursor()
+
+cursor.execute(
+    "INSERT INTO expenses (user_id, category, amount, date) VALUES (?, ?, ?, ?)",
+    (user_id, category, amount, date)
+)
+
+conn.commit()
+conn.close()
+
+return jsonify({"message": "Expense added successfully"})
+
+=====================================================
+
+VIEW EXPENSES
+
+=====================================================
+
+@app.route("/expenses/int:user_id") def get_expenses(user_id): conn = get_db_connection() cursor = conn.cursor()
+
+cursor.execute(
+    "SELECT * FROM expenses WHERE user_id = ?",
+    (user_id,)
+)
+
+expenses = cursor.fetchall()
+conn.close()
+
+return jsonify([dict(expense) for expense in expenses])
+
+=====================================================
+
+ADD GOAL
+
+=====================================================
+
+@app.route("/add_goal", methods=["POST"]) def add_goal(): data = request.json
+
+user_id = data.get("user_id")
+goal_name = data.get("goal_name")
+target_amount = data.get("target_amount")
+saved_amount = data.get("saved_amount")
+deadline = data.get("deadline")
+
+conn = get_db_connection()
+cursor = conn.cursor()
+
+cursor.execute(
+    "INSERT INTO goals (user_id, goal_name, target_amount, saved_amount, deadline) VALUES (?, ?, ?, ?, ?)",
+    (user_id, goal_name, target_amount, saved_amount, deadline)
+)
+
+conn.commit()
+conn.close()
+
+return jsonify({"message": "Goal created successfully"})
+
+=====================================================
+
+VIEW GOALS
+
+=====================================================
+
+@app.route("/goals/int:user_id") def get_goals(user_id): conn = get_db_connection() cursor = conn.cursor()
+
+cursor.execute(
+    "SELECT * FROM goals WHERE user_id = ?",
+    (user_id,)
+)
+
+goals = cursor.fetchall()
+conn.close()
+
+return jsonify([dict(goal) for goal in goals])
+
+=====================================================
+
+MULTI-CURRENCY SUPPORT (BASIC)
+
+=====================================================
+
+@app.route("/currencies") def currencies(): return jsonify([ "INR", "USD", "EUR", "AED", "GBP", "JPY" ])
+
+=====================================================
+
+SYSTEM STATUS
+
+=====================================================
+
+@app.route("/status") def status(): return jsonify({ "system": "Air Space Portfolio Analyser", "plan": "FREE", "limits": "UNLIMITED", "payment": "NOT REQUIRED" })
+
+=====================================================
+
+BASIC FRONTEND PAGES (UI)
+
+=====================================================
+
+Login Page UI
+
+@app.route("/login_page") def login_page(): return """ <html> <head> <title>Login - Air Space Portfolio Analyser</title> </head> <body> <h2>Login</h2> <form action='/login' method='post'> Email: <input type='text' name='email'><br><br> Password: <input type='password' name='password'><br><br> <button type='submit'>Login</button> </form> </body> </html> """
+
+Dashboard Page UI
+
+@app.route("/dashboard_page") def dashboard_page(): return """ <html> <head> <title>Dashboard - Air Space Portfolio Analyser</title> </head> <body> <h1>Air Space Portfolio Analyser Dashboard</h1>
+
+<h3>Add Asset</h3>
+    <form action='/add_asset' method='post'>
+        User ID: <input type='number' name='user_id'><br><br>
+        Asset Name: <input type='text' name='asset_name'><br><br>
+        Asset Type: <input type='text' name='asset_type'><br><br>
+        Value: <input type='number' name='value'><br><br>
+        Currency: <input type='text' name='currency'><br><br>
+        <button type='submit'>Add Asset</button>
+    </form>
+
+    <br>
+
+    <h3>Add Expense</h3>
+    <form action='/add_expense' method='post'>
+        User ID: <input type='number' name='user_id'><br><br>
+        Category: <input type='text' name='category'><br><br>
+        Amount: <input type='number' name='amount'><br><br>
+        Date: <input type='date' name='date'><br><br>
+        <button type='submit'>Add Expense</button>
+    </form>
+
+    <br>
+
+    <h3>Create Goal</h3>
+    <form action='/add_goal' method='post'>
+        User ID: <input type='number' name='user_id'><br><br>
+        Goal Name: <input type='text' name='goal_name'><br><br>
+        Target Amount: <input type='number' name='target_amount'><br><br>
+        Saved Amount: <input type='number' name='saved_amount'><br><br>
+        Deadline: <input type='date' name='deadline'><br><br>
+        <button type='submit'>Create Goal</button>
+    </form>
+
+</body>
+</html>
+"""
+
+=====================================================
+
+SECURITY UPGRADE - PASSWORD HASHING
+
+=====================================================
+
+from werkzeug.security import generate_password_hash, check_password_hash
+
+Updated Register with hashing
+
+@app.route("/secure_register", methods=["POST"]) def secure_register(): data = request.json
+
+name = data.get("name")
+email = data.get("email")
+password = data.get("password")
+
+hashed_password = generate_password_hash(password)
+
+conn = get_db_connection()
+cursor = conn.cursor()
+
+cursor.execute(
+    "INSERT INTO users (name, email, password, created_date) VALUES (?, ?, ?, ?)",
+    (name, email, hashed_password, datetime.now())
+)
+
+conn.commit()
+conn.close()
+
+return jsonify({"message": "User registered securely"})
+
+Updated Login with hash check
+
+@app.route("/secure_login", methods=["POST"]) def secure_login(): data = request.json
+
+email = data.get("email")
+password = data.get("password")
+
+conn = get_db_connection()
+cursor = conn.cursor()
+
+cursor.execute(
+    "SELECT * FROM users WHERE email = ?",
+    (email,)
+)
+
+user = cursor.fetchone()
+conn.close()
+
+if user and check_password_hash(user["password"], password):
+    return jsonify({"message": "Secure login successful", "user_id": user["id"]})
+else:
+    return jsonify({"message": "Invalid credentials"}), 401
+
+=====================================================
+
+EXPORT DATA TO CSV (REPORT FEATURE)
+
+=====================================================
+
+import csv from flask import send_file
+
+@app.route("/export_assets/int:user_id") def export_assets(user_id): conn = get_db_connection() cursor = conn.cursor()
+
+cursor.execute(
+    "SELECT asset_name, asset_type, value, currency FROM assets WHERE user_id = ?",
+    (user_id,)
+)
+
+rows = cursor.fetchall()
+conn.close()
+
+filename = f"assets_user_{user_id}.csv"
+
+with open(filename, "w", newline="") as file:
+    writer = csv.writer(file)
+    writer.writerow(["Asset Name", "Type", "Value", "Currency"])
+
+    for row in rows:
+        writer.writerow([
+            row["asset_name"],
+            row["asset_type"],
+            row["value"],
+            row["currency"]
+        ])
+
+return send_file(filename, as_attachment=True)
+
+=====================================================
+
+BASIC ANALYTICS - TOTAL EXPENSES & TOTAL ASSETS
+
+=====================================================
+
+@app.route("/summary/int:user_id") def summary(user_id): conn = get_db_connection() cursor = conn.cursor()
+
+cursor.execute(
+    "SELECT SUM(value) as total_assets FROM assets WHERE user_id = ?",
+    (user_id,)
+)
+
+assets_total = cursor.fetchone()["total_assets"] or 0
+
+cursor.execute(
+    "SELECT SUM(amount) as total_expenses FROM expenses WHERE user_id = ?",
+    (user_id,)
+)
+
+expenses_total = cursor.fetchone()["total_expenses"] or 0
+
+conn.close()
+
+return jsonify({
+    "total_assets": assets_total,
+    "total_expenses": expenses_total,
+    "net_balance": assets_total - expenses_total
+})
+
+=====================================================
+
+CHARTS DASHBOARD PAGE (VISUAL ANALYTICS)
+
+=====================================================
+
+@app.route("/charts_dashboard/int:user_id") def charts_dashboard(user_id): return f""" <html> <head> <title>Charts Dashboard</title> <script src="https://cdn.jsdelivr.net/npm/chart.js"></script> </head> <body> <h2>Financial Charts Dashboard</h2>
+
+<canvas id='assetsChart' width='400' height='200'></canvas>
+    <canvas id='expensesChart' width='400' height='200'></canvas>
+
+    <script>
+    async function loadData() {{
+        const summaryResponse = await fetch('/summary/{user_id}');
+        const summary = await summaryResponse.json();
+
+        const assetsData = {{
+            labels: ['Assets'],
+            datasets: [{{
+                label: 'Total Assets',
+                data: [summary.total_assets]
+            }}]
+        }};
+
+        const expensesData = {{
+            labels: ['Expenses'],
+            datasets: [{{
+                label: 'Total Expenses',
+                data: [summary.total_expenses]
+            }}]
+        }};
+
+        new Chart(document.getElementById('assetsChart'), {{
+            type: 'bar',
+            data: assetsData
+        }});
+
+        new Chart(document.getElementById('expensesChart'), {{
+            type: 'bar',
+            data: expensesData
+        }});
+    }}
+
+    loadData();
+    </script>
+
+</body>
+</html>
+"""
+
+=====================================================
+
+SIMPLE DARK MODE TOGGLE (UI ENHANCEMENT)
+
+=====================================================
+
+@app.route("/dark_mode_demo") def dark_mode_demo(): return """ <html> <head> <title>Dark Mode Demo</title> <style> body.dark { background-color: black; color: white; } </style> </head> <body> <h2>Dark Mode Toggle</h2> <button onclick="toggleMode()">Toggle Dark Mode</button>
+
+<script>
+        function toggleMode() {
+            document.body.classList.toggle('dark');
+        }
+    </script>
+</body>
+</html>
+"""
+
+=====================================================
+
+DEPLOYMENT READY CHECK ROUTE
+
+=====================================================
+
+@app.route("/health") def health(): return jsonify({ "status": "OK", "app": "Air Space Portfolio Analyser", "deployment": "READY" })
+
+=====================================================
+
+USER AUTHENTICATION SESSIONS (LOGIN PERSISTENCE)
+
+=====================================================
+
+from flask import session
+
+app.secret_key = "air_space_secret_key"
+
+@app.route("/session_login", methods=["POST"]) def session_login(): data = request.json
+
+email = data.get("email")
+password = data.get("password")
+
+conn = get_db_connection()
+cursor = conn.cursor()
+
+cursor.execute(
+    "SELECT * FROM users WHERE email = ?",
+    (email,)
+)
+
+user = cursor.fetchone()
+conn.close()
+
+if user and check_password_hash(user["password"], password):
+    session["user_id"] = user["id"]
+    return jsonify({"message": "Session login successful"})
+else:
+    return jsonify({"message": "Invalid credentials"}), 401
+
+@app.route("/logout") def logout(): session.pop("user_id", None) return jsonify({"message": "Logged out successfully"})
+
+=====================================================
+
+NOTIFICATION SYSTEM (BASIC)
+
+=====================================================
+
+Notifications table creation
+
+def create_notifications_table(): conn = get_db_connection() cursor = conn.cursor()
+
+cursor.execute("""
+    CREATE TABLE IF NOT EXISTS notifications (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
+        message TEXT,
+        created_date TEXT
+    )
+""")
+
+conn.commit()
+conn.close()
+
+@app.route("/add_notification", methods=["POST"]) def add_notification(): data = request.json
+
+user_id = data.get("user_id")
+message = data.get("message")
+
+conn = get_db_connection()
+cursor = conn.cursor()
+
+cursor.execute(
+    "INSERT INTO notifications (user_id, message, created_date) VALUES (?, ?, ?)",
+    (user_id, message, datetime.now())
+)
+
+conn.commit()
+conn.close()
+
+return jsonify({"message": "Notification added"})
+
+@app.route("/notifications/int:user_id") def get_notifications(user_id): conn = get_db_connection() cursor = conn.cursor()
+
+cursor.execute(
+    "SELECT * FROM notifications WHERE user_id = ? ORDER BY created_date DESC",
+    (user_id,)
+)
+
+notifications = cursor.fetchall()
+conn.close()
+
+return jsonify([dict(note) for note in notifications])
+
+=====================================================
+
+REAL-TIME STOCK PRICE API (PORTFOLIO AUTO VALUE)
+
+=====================================================
+
+import requests
+
+NOTE: Replace YOUR_API_KEY with your real key from Alpha Vantage or similar provider
+
+STOCK_API_KEY = "YOUR_API_KEY"
+
+@app.route("/stock_price/<symbol>") def stock_price(symbol): url = f"https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol={symbol}&apikey={STOCK_API_KEY}"
+
+try:
+    response = requests.get(url)
+    data = response.json()
+
+    price = data.get("Global Quote", {}).get("05. price", None)
+
+    if price:
+        return jsonify({
+            "symbol": symbol,
+            "price": float(price),
+            "currency": "USD"
+        })
+    else:
+        return jsonify({
+            "error": "Stock symbol not found or API limit reached"
+        }), 404
+
+except Exception as e:
+    return jsonify({
+        "error": str(e)
+    }), 500
+
+=====================================================
+
+DEPLOYMENT CONFIGURATION (PRODUCTION READY)
+
+=====================================================
+
+Create requirements.txt automatically
+
+def generate_requirements(): packages = [ "flask", "requests", "werkzeug" ]
+
+with open("requirements.txt", "w") as f:
+    for pkg in packages:
+        f.write(pkg + "
+
+")
+
+Production start command example (Gunicorn)
+
+Run this in deployment server:
+
+gunicorn app:app --bind 0.0.0.0:10000
+
+@app.route("/deployment_info") def deployment_info(): return jsonify({ "platforms_supported": [ "Render", "Railway", "AWS" ], "start_command": "gunicorn app:app --bind 0.0.0.0:10000", "status": "READY_FOR_DEPLOYMENT" })
